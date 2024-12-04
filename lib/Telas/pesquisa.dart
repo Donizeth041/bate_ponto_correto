@@ -93,8 +93,7 @@ class _PesquisaScreenState extends State<PesquisaScreen> {
                 var funcionario = _filteredFuncionarios[index];
                 return ListTile(
                   title: Text(funcionario.nome),
-                  subtitle: Text(
-                      'Último Ponto: 2024-10-01 17:00'), // Exemplo de ponto
+                  subtitle: Text('Visualizar o Ponto!'), // Exemplo de ponto
                   onTap: () => _openFuncionarioPontosScreen(funcionario.id),
                 );
               },
