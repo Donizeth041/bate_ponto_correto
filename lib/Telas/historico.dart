@@ -1,6 +1,10 @@
+import 'package:bateponto/models/usuario.dart';
 import 'package:flutter/material.dart';
-import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:bateponto/services/authservice.dart';
+import 'package:bateponto/services/usuarioservice.dart';
+import 'package:bateponto/services/pontoservice.dart';
+import 'package:bateponto/models/ponto.dart';
 
 class HistoricoScreen extends StatefulWidget {
   @override
@@ -9,18 +13,22 @@ class HistoricoScreen extends StatefulWidget {
 
 class _HistoricoScreenState extends State<HistoricoScreen> {
   String tipoUsuario = ''; // Vai armazenar o tipo de usuário
+  final PontoService _pontoService = PontoService();
+  final UsuarioService _usuarioService = UsuarioService();
+  final AuthService _authService = AuthService();
 
   // Função para verificar o tipo de usuário
   Future<void> verificarTipoUsuario() async {
-    User? user = FirebaseAuth.instance.currentUser;
+    User? user = _authService.currentUser;
     if (user != null) {
-      DocumentSnapshot userDoc = await FirebaseFirestore.instance
-          .collection('usuarios')
-          .doc(user.uid)
-          .get();
-      setState(() {
-        tipoUsuario = userDoc['tipo']; // 'admin' ou 'funcionario'
-      });
+      try {
+        Usuario usuario = await _usuarioService.getUsuarioById(user.uid);
+        setState(() {
+          tipoUsuario = usuario.tipo;
+        });
+      } catch (e) {
+        print('Erro ao obter tipo de usuário: $e');
+      }
     }
   }
 
@@ -51,33 +59,33 @@ class _HistoricoScreenState extends State<HistoricoScreen> {
                   CircularProgressIndicator()) // Exibe o loading enquanto carrega
           : tipoUsuario == 'admin'
               // Exibe todos os pontos para admin
-              ? StreamBuilder<QuerySnapshot>(
-                  stream: FirebaseFirestore.instance
-                      .collection('pontos')
-                      .snapshots(),
+              ? FutureBuilder<List<Ponto>>(
+                  future: _pontoService.getAllPontos(), // Obtém todos os pontos
                   builder: (context, snapshot) {
                     if (snapshot.connectionState == ConnectionState.waiting) {
                       return Center(child: CircularProgressIndicator());
                     }
 
-                    if (!snapshot.hasData || snapshot.data!.docs.isEmpty) {
+                    if (snapshot.hasError) {
+                      return Center(child: Text('Erro: ${snapshot.error}'));
+                    }
+
+                    if (!snapshot.hasData || snapshot.data!.isEmpty) {
                       return Center(child: Text('Nenhum ponto registrado.'));
                     }
 
                     return ListView.builder(
-                      itemCount: snapshot.data!.docs.length,
+                      itemCount: snapshot.data!.length,
                       itemBuilder: (context, index) {
-                        var ponto = snapshot.data!.docs[index];
+                        var ponto = snapshot.data![index];
                         return ListTile(
-                          title: Text('Entrada: ${ponto['data_ponto']}'),
-                          subtitle: Text('Status: ${ponto['status']}'),
+                          title: Text('Entrada: ${ponto.entrada}'),
+                          subtitle: Text('Saída: ${ponto.saida}'),
                           trailing: IconButton(
                             icon: Icon(Icons.delete),
                             onPressed: () {
-                              FirebaseFirestore.instance
-                                  .collection('pontos')
-                                  .doc(ponto.id)
-                                  .delete();
+                              _pontoService.deletePonto(ponto.id);
+                              setState(() {});
                             },
                           ),
                         );
@@ -86,28 +94,29 @@ class _HistoricoScreenState extends State<HistoricoScreen> {
                   },
                 )
               : // Exibe apenas os pontos do usuário logado para o funcionário
-              StreamBuilder<QuerySnapshot>(
-                  stream: FirebaseFirestore.instance
-                      .collection('pontos')
-                      .where('uid',
-                          isEqualTo: FirebaseAuth.instance.currentUser!.uid)
-                      .snapshots(),
+              FutureBuilder<List<Ponto>>(
+                  future: _pontoService.getPontosByUsuario(_authService
+                      .currentUser!.uid), // Obtém os pontos do usuário logado
                   builder: (context, snapshot) {
                     if (snapshot.connectionState == ConnectionState.waiting) {
                       return Center(child: CircularProgressIndicator());
                     }
 
-                    if (!snapshot.hasData || snapshot.data!.docs.isEmpty) {
+                    if (snapshot.hasError) {
+                      return Center(child: Text('Erro: ${snapshot.error}'));
+                    }
+
+                    if (!snapshot.hasData || snapshot.data!.isEmpty) {
                       return Center(child: Text('Nenhum ponto registrado.'));
                     }
 
                     return ListView.builder(
-                      itemCount: snapshot.data!.docs.length,
+                      itemCount: snapshot.data!.length,
                       itemBuilder: (context, index) {
-                        var ponto = snapshot.data!.docs[index];
+                        var ponto = snapshot.data![index];
                         return ListTile(
-                          title: Text('Entrada: ${ponto['data_ponto']}'),
-                          subtitle: Text('Status: ${ponto['status']}'),
+                          title: Text('Entrada: ${ponto.entrada}'),
+                          subtitle: Text('Saída: ${ponto.saida}'),
                         );
                       },
                     );

@@ -1,3 +1,5 @@
+import 'package:cloud_firestore/cloud_firestore.dart';
+
 class Ponto {
   final String id;
   final String usuarioId;
@@ -16,8 +18,11 @@ class Ponto {
     return Ponto(
       id: id,
       usuarioId: json['usuarioId'],
-      entrada: DateTime.parse(json['entrada']),
-      saida: json['saida'] != null ? DateTime.parse(json['saida']) : null,
+      // Converte o Timestamp para DateTime
+      entrada: (json['entrada'] as Timestamp).toDate(),
+      // Verifica se 'saida' existe e converte para DateTime, se não, deixa como null
+      saida:
+          json['saida'] != null ? (json['saida'] as Timestamp).toDate() : null,
     );
   }
 
@@ -25,8 +30,11 @@ class Ponto {
   Map<String, dynamic> toJson() {
     return {
       'usuarioId': usuarioId,
-      'entrada': entrada.toIso8601String(),
-      'saida': saida?.toIso8601String(),
+      // Enviar o DateTime como Timestamp para o Firestore
+      'entrada': Timestamp.fromDate(entrada),
+      'saida': saida != null
+          ? Timestamp.fromDate(saida!)
+          : null, // Somente se saida não for null
     };
   }
 }

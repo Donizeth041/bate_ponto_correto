@@ -1,5 +1,7 @@
+import 'package:bateponto/Telas/funcionariopontosscreen.dart';
 import 'package:flutter/material.dart';
-import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:bateponto/services/usuarioservice.dart'; // Importando UsuarioService
+import 'package:bateponto/models/usuario.dart';
 
 class PesquisaScreen extends StatefulWidget {
   @override
@@ -8,20 +10,51 @@ class PesquisaScreen extends StatefulWidget {
 
 class _PesquisaScreenState extends State<PesquisaScreen> {
   TextEditingController _searchController = TextEditingController();
-  List<DocumentSnapshot> _funcionarios = [];
+  List<Usuario> _funcionarios = [];
+  List<Usuario> _filteredFuncionarios = [];
+  final UsuarioService _usuarioService =
+      UsuarioService(); // Instância do UsuarioService
 
-  // Função para buscar funcionários no Firestore
-  void _searchFuncionarios(String nome) async {
-    // Realiza a busca no Firestore
-    QuerySnapshot snapshot = await FirebaseFirestore.instance
-        .collection('usuarios')
-        .where('name', isGreaterThanOrEqualTo: nome)
-        .where('name', isLessThan: nome + 'z')
-        .get();
+  @override
+  void initState() {
+    super.initState();
+    _loadFuncionarios(); // Carregar todos os funcionários
+  }
 
+  // Função para carregar todos os funcionários usando UsuarioService
+  void _loadFuncionarios() async {
+    try {
+      List<Usuario> funcionarios =
+          await _usuarioService.getUsuarios(); // Carregar todos os usuários
+      setState(() {
+        _funcionarios = funcionarios;
+        _filteredFuncionarios = funcionarios;
+      });
+    } catch (e) {
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+        content: Text('Erro ao carregar funcionários: $e'),
+      ));
+    }
+  }
+
+  // Função para buscar funcionários conforme o nome digitado
+  void _searchFuncionarios(String nome) {
     setState(() {
-      _funcionarios = snapshot.docs;
+      _filteredFuncionarios = _funcionarios
+          .where((funcionario) =>
+              funcionario.nome.toLowerCase().contains(nome.toLowerCase()))
+          .toList();
     });
+  }
+
+  // Função para navegar para a tela de pontos do funcionário
+  void _openFuncionarioPontosScreen(String usuarioId) {
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (context) => FuncionarioPontosScreen(usuarioId: usuarioId),
+      ),
+    );
   }
 
   @override
@@ -29,7 +62,8 @@ class _PesquisaScreenState extends State<PesquisaScreen> {
     return Scaffold(
       backgroundColor: Colors.white,
       appBar: AppBar(
-        title: Text('Pesquisar Pontos', style: TextStyle(color: Colors.black)),
+        title: Text('Pesquisar Funcionários',
+            style: TextStyle(color: Colors.black)),
         backgroundColor: Colors.blue,
         leading: IconButton(
           icon: Icon(Icons.arrow_back, color: Colors.black),
@@ -48,18 +82,20 @@ class _PesquisaScreenState extends State<PesquisaScreen> {
                 labelText: 'Pesquisar Nome',
                 labelStyle: TextStyle(color: Colors.black),
               ),
-              onChanged: _searchFuncionarios,
+              onChanged:
+                  _searchFuncionarios, // Filtra os funcionários ao digitar
             ),
           ),
           Expanded(
             child: ListView.builder(
-              itemCount: _funcionarios.length,
+              itemCount: _filteredFuncionarios.length,
               itemBuilder: (context, index) {
-                var funcionario = _funcionarios[index];
+                var funcionario = _filteredFuncionarios[index];
                 return ListTile(
-                  title: Text(funcionario['name']),
+                  title: Text(funcionario.nome),
                   subtitle: Text(
-                      'Último Ponto: 2024-10-01 17:00'), // Pode adicionar o timestamp do ponto aqui
+                      'Último Ponto: 2024-10-01 17:00'), // Exemplo de ponto
+                  onTap: () => _openFuncionarioPontosScreen(funcionario.id),
                 );
               },
             ),

@@ -1,8 +1,9 @@
-import 'package:firebase_auth/firebase_auth.dart';
-import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:bateponto/Telas/mainscreen.dart';
+import 'package:bateponto/services/usuarioservice.dart';
 import 'package:flutter/material.dart';
-import 'home_screen.dart'; // Para o admin
-import 'funcionario_home.dart'; // Para o funcionário
+import 'package:bateponto/services/authservice.dart'; // Importe o AuthService
+import 'package:firebase_auth/firebase_auth.dart';
+import 'package:bateponto/models/usuario.dart';
 
 class LoginScreen extends StatefulWidget {
   @override
@@ -13,44 +14,39 @@ class _LoginScreenState extends State<LoginScreen> {
   // Controladores para os campos de texto
   final TextEditingController _emailController = TextEditingController();
   final TextEditingController _passwordController = TextEditingController();
+  final AuthService _auth = AuthService(); // Instância do AuthService
+  final UsuarioService _userService =
+      UsuarioService(); // Instância do AuthService
 
   // Função de login
   Future<void> login(String email, String senha) async {
     try {
-      // Realiza a autenticação do usuário
-      UserCredential userCredential =
-          await FirebaseAuth.instance.signInWithEmailAndPassword(
-        email: email,
-        password: senha,
-      );
+      // Realiza o login através do AuthService
+      UserCredential? userCredential =
+          await _auth.signInWithEmailPassword(email: email, password: senha);
 
-      // Obtém a referência do Firestore para a coleção de usuários
-      DocumentSnapshot userDoc = await FirebaseFirestore.instance
-          .collection('usuarios')
-          .doc(userCredential.user!.uid)
-          .get();
+      if (userCredential != null) {
+        // Obtém o tipo de usuário após o login
+        Usuario usuario =
+            await _userService.getUsuarioById(userCredential.user!.uid);
+        String tipoUsuario = usuario.tipo;
 
-      // Verifica o tipo de usuário
-      String tipoUsuario = userDoc['tipo']; // 'admin' ou 'funcionario'
+        // Redireciona para a tela apropriada com base no tipo de usuário
 
-      // Redireciona para a tela de Bater Ponto após o login, dependendo do tipo de usuário
-      if (tipoUsuario == 'admin') {
         Navigator.pushReplacement(
           context,
           MaterialPageRoute(
-              builder: (context) => HomeScreen()), // Tela do admin
+              builder: (context) => MainScreen()), // Tela do admin
         );
-      } else if (tipoUsuario == 'funcionario') {
-        Navigator.pushReplacement(
-          context,
-          MaterialPageRoute(
-              builder: (context) => FuncionarioHome()), // Tela do funcionário
-        );
+      } else {
+        ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('Email e/ou senha incorretos!')));
       }
     } catch (e) {
       print('Erro no login: $e');
       ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Erro ao realizar o login: $e')));
+        SnackBar(content: Text('Erro ao realizar o login: $e')),
+      );
     }
   }
 

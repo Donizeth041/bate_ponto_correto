@@ -1,6 +1,9 @@
+import 'package:bateponto/Telas/mainscreen.dart';
 import 'package:flutter/material.dart';
-import 'package:firebase_auth/firebase_auth.dart';
-import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:bateponto/services/authservice.dart'; // Importe o AuthService
+import 'package:bateponto/services/usuarioservice.dart'; // Importe o AuthService
+import 'package:firebase_auth/firebase_auth.dart'; // Importe o UsuarioService
+import 'package:bateponto/models/usuario.dart';
 
 class RegisterScreen extends StatefulWidget {
   @override
@@ -10,37 +13,45 @@ class RegisterScreen extends StatefulWidget {
 class _RegisterScreenState extends State<RegisterScreen> {
   final _emailController = TextEditingController();
   final _passwordController = TextEditingController();
-  final _tipoController =
-      TextEditingController(); // Campo para 'admin' ou 'funcionario'
-  final FirebaseAuth _auth = FirebaseAuth.instance;
+  final _nameController = TextEditingController();
+  String _selectedTipo = 'funcionario'; // Tipo padrão
+  final AuthService _authService = AuthService();
+  final UsuarioService _usuarioService = UsuarioService();
 
   // Função de registro
   Future<void> _register() async {
     try {
-      // Criar usuário no Firebase Authentication
-      UserCredential userCredential =
-          await _auth.createUserWithEmailAndPassword(
-        email: _emailController.text,
-        password: _passwordController.text,
+      // Cria o usuário no Firebase Authentication
+      //
+      final email = _emailController.text;
+      final password = _passwordController.text;
+      UserCredential? userCredential =
+          await _authService.createUserWithEmailPassword(
+        email: email,
+        password: password,
       );
 
-      // Salvar dados do usuário no Firestore
-      await FirebaseFirestore.instance
-          .collection('usuarios')
-          .doc(userCredential.user!.uid)
-          .set({
-        'email': _emailController.text,
-        'senha': _passwordController
-            .text, // Embora não seja ideal armazenar senha em texto claro
-        'tipo': _tipoController.text, // Pode ser 'admin' ou 'funcionario'
-      });
+      if (userCredential != null) {
+        Usuario newUser = Usuario(
+            id: userCredential.user!.uid,
+            email: _emailController.text,
+            tipo: _selectedTipo,
+            nome: _nameController.text);
 
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-        content: Text('Usuário registrado com sucesso!'),
-      ));
+        await _usuarioService.createUsuario(newUser);
 
-      // Redirecionar para a tela de login após cadastro
-      Navigator.pushReplacementNamed(context, '/login');
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+          content: Text('Usuário registrado com sucesso!'),
+        ));
+        Navigator.pushReplacement(
+          context,
+          MaterialPageRoute(
+              builder: (context) => MainScreen()), // Tela do admin
+        );
+      }
+      // Salva os dados do usuário no Firestore
+
+      // Redireciona para a tela de login após o cadastro
     } catch (e) {
       print('Erro ao registrar usuário: $e');
       ScaffoldMessenger.of(context).showSnackBar(SnackBar(
@@ -60,21 +71,42 @@ class _RegisterScreenState extends State<RegisterScreen> {
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
+            // Campo de email
             TextField(
               controller: _emailController,
               decoration: InputDecoration(labelText: 'Email'),
             ),
+            SizedBox(height: 10),
+            TextField(
+              controller: _nameController,
+              decoration: InputDecoration(labelText: 'Nome'),
+            ),
+            SizedBox(height: 10),
+            // Campo de senha
             TextField(
               controller: _passwordController,
               obscureText: true,
               decoration: InputDecoration(labelText: 'Senha'),
             ),
-            TextField(
-              controller: _tipoController,
-              decoration:
-                  InputDecoration(labelText: 'Tipo (admin/funcionario)'),
+            SizedBox(height: 20),
+            // Dropdown para selecionar tipo de usuário
+            DropdownButton<String>(
+              value: _selectedTipo,
+              onChanged: (String? newValue) {
+                setState(() {
+                  _selectedTipo = newValue!;
+                });
+              },
+              items: <String>['funcionario', 'admin']
+                  .map<DropdownMenuItem<String>>((String value) {
+                return DropdownMenuItem<String>(
+                  value: value,
+                  child: Text(value),
+                );
+              }).toList(),
             ),
             SizedBox(height: 20),
+            // Botão de registro
             ElevatedButton(
               onPressed: _register,
               child: Text('Registrar'),
